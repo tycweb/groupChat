@@ -1,0 +1,2 @@
+rootProject.name = "TyceptApp"
+include ':app'
