@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="@color/bg_dark"
+    android:padding="24dp">
+
+    <Button
+        android:id="@+id/chooseButton"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Choose Files"
+        android:backgroundTint="@color/accent"
+        android:layout_marginBottom="16dp" />
+
+    <TextView
+        android:id="@+id/filesText"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="No files chosen"
+        android:textColor="@android:color/white"
+        android:layout_marginBottom="16dp" />
+
+    <Button
+        android:id="@+id/startButton"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Start Sharing"
+        android:backgroundTint="@color/accent"
+        android:layout_marginBottom="16dp" />
+
+    <TextView
+        android:id="@+id/addressText"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:textColor="@color/accent"
+        android:textSize="16sp" />
+
+</LinearLayout>

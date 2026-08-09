@@ -1,14 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="black0">#0b0d0f</color>
-    <color name="black1">#0f1214</color>
-    <color name="black2">#14171a</color>
-    <color name="black3">#1c2024</color>
-    <color name="line">#22262b</color>
-    <color name="white">#ffffff</color>
-    <color name="gray1">#8a8f94</color>
-    <color name="gray2">#5c6064</color>
-    <color name="accent1">#ff6b35</color>
-    <color name="accent2">#ff8c60</color>
-    <color name="online_green">#3ddc84</color>
+    <color name="bg_dark">#0a0b10</color>
+    <color name="accent">#7c93ff</color>
 </resources>
