@@ -1,6 +1,7 @@
 package com.example.tycept;
 
 import android.content.Context;
+import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
 import android.text.format.DateFormat;
 import android.view.LayoutInflater;
@@ -23,6 +24,11 @@ public class ConversationAdapter extends ArrayAdapter<JSONObject> {
     private String myName;
     private Listener listener;
 
+    // Set right before notifyDataSetChanged() when a conversation was just
+    // bumped to the top because of an incoming message, so getView() can
+    // play the "pop" animation on it exactly once instead of every re-bind.
+    private String pendingBumpConvId;
+
     public ConversationAdapter(Context context, JSONArray conversations, String myName, Listener listener) {
         super(context, 0);
         inflater = LayoutInflater.from(context);
@@ -33,6 +39,11 @@ public class ConversationAdapter extends ArrayAdapter<JSONObject> {
                 add(conversations.optJSONObject(i));
             }
         }
+    }
+
+    /** Call right before notifyDataSetChanged() after moving convId to the top. */
+    public void playBumpAnimationOnceFor(String convId) {
+        pendingBumpConvId = convId;
     }
 
     @Override
@@ -47,8 +58,33 @@ public class ConversationAdapter extends ArrayAdapter<JSONObject> {
         TextView titleView = view.findViewById(R.id.convTitle);
         TextView previewView = view.findViewById(R.id.convPreview);
         TextView timeView = view.findViewById(R.id.convTime);
+        View unreadDot = view.findViewById(R.id.convUnreadDot);
         View avatarBg = view.findViewById(R.id.convAvatarBg);
         TextView avatarInitial = view.findViewById(R.id.convAvatarInitial);
+
+        // "_unread" is a client-only flag we stamp onto the conversation's
+        // JSONObject (see ConversationsActivity) — it's never sent to the
+        // server, just used here to make a conversation that just got a new
+        // message stand out until the user taps into it.
+        boolean unread = conv.optBoolean("_unread", false);
+        if (unread) {
+            card.setBackgroundResource(R.drawable.card_bg_highlight);
+            previewView.setTypeface(Typeface.DEFAULT_BOLD);
+            previewView.setTextColor(0xFFFFFFFF);
+            unreadDot.setVisibility(View.VISIBLE);
+        } else {
+            card.setBackgroundResource(R.drawable.card_bg);
+            previewView.setTypeface(Typeface.DEFAULT);
+            previewView.setTextColor(getContext().getResources().getColor(R.color.gray1));
+            unreadDot.setVisibility(View.GONE);
+        }
+
+        String convId = conv.optString("id");
+        if (pendingBumpConvId != null && pendingBumpConvId.equals(convId)) {
+            card.clearAnimation();
+            card.startAnimation(AnimationUtils.loadAnimation(getContext(), R.anim.bump_new_message));
+            pendingBumpConvId = null;
+        }
 
         String title = conv.optString("name");
         if (title == null || title.isEmpty()) {
