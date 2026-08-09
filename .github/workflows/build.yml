@@ -32,12 +32,23 @@ jobs:
           # relying on a wrapper script.
           gradle-version: '8.4'
 
+      - name: Locate Android project
+        id: locate
+        run: |
+          PROJECT_DIR=$(dirname "$(find "$GITHUB_WORKSPACE" -maxdepth 4 -name settings.gradle -o -maxdepth 4 -name settings.gradle.kts | head -n 1)")
+          if [ -z "$PROJECT_DIR" ]; then
+            echo "Could not find settings.gradle anywhere in the repo (searched 4 levels deep)."
+            exit 1
+          fi
+          echo "Building project at: $PROJECT_DIR"
+          echo "dir=$PROJECT_DIR" >> "$GITHUB_OUTPUT"
+
       - name: Build debug APK
-        working-directory: TyceptApp
+        working-directory: ${{ steps.locate.outputs.dir }}
         run: gradle assembleDebug --no-daemon
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: tycept-debug-apk
-          path: TyceptApp/app/build/outputs/apk/debug/*.apk
+          path: ${{ steps.locate.outputs.dir }}/app/build/outputs/apk/debug/*.apk
