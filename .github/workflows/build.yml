@@ -27,10 +27,10 @@ jobs:
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
         with:
-          # Matches gradle/wrapper/gradle-wrapper.properties — no gradlew is
-          # checked into this repo, so we install Gradle directly instead of
-          # relying on a wrapper script.
-          gradle-version: '8.4'
+          # AGP 8.5.0 (used in this project's build.gradle.kts) requires
+          # Gradle 8.7+. No gradlew is checked into this repo, so we install
+          # Gradle directly instead of relying on a wrapper script.
+          gradle-version: '8.7'
 
       - name: Locate Android project
         id: locate
@@ -52,3 +52,4 @@ jobs:
         with:
           name: tycept-debug-apk
           path: ${{ steps.locate.outputs.dir }}/app/build/outputs/apk/debug/*.apk
+          
