@@ -50,6 +50,8 @@ public class ChatActivity extends Activity {
     private View sendButton;
     private View attachButton;
     private TextView titleView;
+    private TextView subtitleView;
+    private TextView avatarInitialView;
 
     private List<ChatMessage> messages = new ArrayList<>();
     private ChatMessageAdapter adapter;
@@ -70,6 +72,29 @@ public class ChatActivity extends Activity {
 
         titleView = findViewById(R.id.chatTitle);
         titleView.setText(passedTitle);
+
+        subtitleView = findViewById(R.id.chatSubtitle);
+        avatarInitialView = findViewById(R.id.chatAvatarInitial);
+        if (!TextUtils.isEmpty(passedTitle)) {
+            avatarInitialView.setText(passedTitle.substring(0, 1).toUpperCase());
+        }
+
+        findViewById(R.id.backButton).setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                finish();
+            }
+        });
+
+        View.OnClickListener comingSoon = new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                Toast.makeText(ChatActivity.this, "Coming soon", Toast.LENGTH_SHORT).show();
+            }
+        };
+        findViewById(R.id.searchButton).setOnClickListener(comingSoon);
+        findViewById(R.id.paletteButton).setOnClickListener(comingSoon);
+        findViewById(R.id.bellButton).setOnClickListener(comingSoon);
 
         listView = findViewById(R.id.messageListView);
         skeletonContainer = findViewById(R.id.skeletonContainer);

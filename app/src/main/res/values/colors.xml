@@ -10,4 +10,5 @@
     <color name="gray2">#5c6064</color>
     <color name="accent1">#ff6b35</color>
     <color name="accent2">#ff8c60</color>
+    <color name="online_green">#3ddc84</color>
 </resources>
