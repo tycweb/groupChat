@@ -9,20 +9,20 @@ import android.view.View;
 import android.widget.FrameLayout;
 
 /**
- * Wraps a single child (the full-screen photo ImageView, or the VideoView) in
+ * Wraps a single child (the full-screen photo ImageView, or the PlayerView) in
  * MediaViewerActivity and adds pinch-to-zoom, drag-to-pan while zoomed in, and
  * double-tap to zoom — the "zooming feature when opening videos/photos" the
  * chat bubbles themselves don't need but the full-screen viewer does.
  *
  * Zoom/pan are applied as scaleX/Y + translationX/Y on the child view rather
  * than a Matrix, so the exact same code works for both an ImageView and a
- * VideoView without needing separate implementations.
+ * PlayerView without needing separate implementations.
  *
  * This layout owns all touch input on itself (it always intercepts) rather
  * than trying to selectively pass single taps through to the child — for a
  * video, MediaViewerActivity is told about taps via setOnSingleTapListener
- * and re-shows the MediaController itself, so tapping to reveal controls
- * still works even though the VideoView never sees the raw touch.
+ * and toggles the PlayerView's controller itself, so tapping to reveal
+ * controls still works even though the PlayerView never sees the raw touch.
  */
 public class PinchZoomLayout extends FrameLayout {
 

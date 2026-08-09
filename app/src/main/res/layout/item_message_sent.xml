@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:id="@+id/messageRow"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
@@ -89,11 +90,14 @@
                 android:scaleType="fitCenter"
                 android:background="@color/black3" />
 
-            <VideoView
+            <androidx.media3.ui.PlayerView
                 android:id="@+id/messageVideoPlayer"
                 android:layout_width="match_parent"
                 android:layout_height="200dp"
-                android:visibility="gone" />
+                android:visibility="gone"
+                app:resize_mode="fit"
+                app:use_controller="false"
+                app:show_buffering="never" />
 
             <FrameLayout
                 android:id="@+id/playButtonOverlay"

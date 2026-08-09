@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="#000000">
@@ -24,10 +25,20 @@
         android:layout_height="match_parent"
         android:visibility="gone">
 
-        <VideoView
+        <!-- resize_mode="fit" + AspectRatioFrameLayout (built into PlayerView)
+             keeps whatever aspect ratio the source video actually has — a
+             16:9 video stays 16:9, a 9:16 video stays 9:16 — instead of
+             VideoView's tendency to re-measure and jump on some devices. -->
+        <androidx.media3.ui.PlayerView
             android:id="@+id/viewerVideo"
             android:layout_width="match_parent"
-            android:layout_height="match_parent" />
+            android:layout_height="match_parent"
+            android:layout_gravity="center"
+            app:resize_mode="fit"
+            app:surface_type="surface_view"
+            app:use_controller="true"
+            app:controller_layout_id="@layout/custom_video_controls"
+            app:show_buffering="when_playing" />
 
     </com.example.tycept.PinchZoomLayout>
 

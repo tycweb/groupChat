@@ -3,8 +3,7 @@ package com.example.tycept;
 import android.app.Activity;
 import android.content.Context;
 import android.content.Intent;
-import android.media.MediaPlayer;
-import android.net.Uri;
+import android.graphics.Bitmap;
 import android.text.TextUtils;
 import android.text.format.DateFormat;
 import android.view.LayoutInflater;
@@ -12,14 +11,19 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.widget.ImageView;
 import android.widget.TextView;
-import android.widget.VideoView;
 
 import androidx.annotation.NonNull;
+import androidx.media3.common.MediaItem;
+import androidx.media3.common.PlaybackException;
+import androidx.media3.common.Player;
+import androidx.media3.exoplayer.ExoPlayer;
+import androidx.media3.ui.PlayerView;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.bumptech.glide.Glide;
 import com.bumptech.glide.load.resource.drawable.DrawableTransitionOptions;
 
+import java.util.ArrayList;
 import java.util.List;
 
 // RecyclerView.Adapter replaces the old ListView/ArrayAdapter. ListView's row
@@ -38,6 +42,12 @@ public class ChatMessageAdapter extends RecyclerView.Adapter<ChatMessageAdapter.
     // different one (or scrolling it off) reverts the previous back to its
     // thumbnail. This is UI-only state, not persisted with the message.
     private ChatMessage currentlyPlaying;
+
+    // One ExoPlayer per row that has ever played a video, created lazily so
+    // scrolling past a video-less row costs nothing. Tracked here (rather
+    // than only on the ViewHolder) so the activity can release every player
+    // on teardown even if some are on rows currently scrolled off-screen.
+    private final List<ExoPlayer> players = new ArrayList<>();
 
     // Matches the web app's GROUP_WINDOW_MS: consecutive messages from the
     // same sender within this window are visually grouped — name/avatar and
@@ -143,9 +153,34 @@ public class ChatMessageAdapter extends RecyclerView.Adapter<ChatMessageAdapter.
         // A recycled row might still be holding a live player from whatever
         // message it displayed before — make sure it's stopped so audio/video
         // doesn't keep running behind a different, now-visible row.
-        if (holder.player != null && holder.player.isPlaying()) {
-            holder.player.stopPlayback();
+        if (holder.exoPlayer != null) {
+            holder.exoPlayer.stop();
         }
+    }
+
+    // The bubble's video container is a fixed width (230dp) with the height
+    // derived from the video's real aspect ratio, clamped to the same
+    // min/max the XML previously enforced via the thumbnail's
+    // adjustViewBounds. Computing it from the cached thumbnail frame — the
+    // same source both the "showing thumbnail" and "playing" states read —
+    // means both states always resolve to the exact same pixel height, so
+    // the bubble never visibly resizes when playback starts. A 16:9 video
+    // stays the 16:9-derived height; a 9:16 video stays the 9:16-derived one.
+    private static final int VIDEO_CONTAINER_WIDTH_DP = 230;
+    private static final int VIDEO_MIN_HEIGHT_DP = 150;
+    private static final int VIDEO_MAX_HEIGHT_DP = 320;
+    private static final int VIDEO_DEFAULT_HEIGHT_DP = 200;
+
+    private int videoContainerHeightPx(Bitmap thumbnailFrame) {
+        float density = context.getResources().getDisplayMetrics().density;
+        if (thumbnailFrame == null || thumbnailFrame.getWidth() <= 0 || thumbnailFrame.getHeight() <= 0) {
+            return Math.round(VIDEO_DEFAULT_HEIGHT_DP * density);
+        }
+        int containerWidthPx = Math.round(VIDEO_CONTAINER_WIDTH_DP * density);
+        int minHeightPx = Math.round(VIDEO_MIN_HEIGHT_DP * density);
+        int maxHeightPx = Math.round(VIDEO_MAX_HEIGHT_DP * density);
+        int height = Math.round(containerWidthPx * (float) thumbnailFrame.getHeight() / thumbnailFrame.getWidth());
+        return Math.max(minHeightPx, Math.min(maxHeightPx, height));
     }
 
     private void bindImage(final MessageViewHolder holder, final ChatMessage message, boolean groupedNext) {
@@ -185,7 +220,7 @@ public class ChatMessageAdapter extends RecyclerView.Adapter<ChatMessageAdapter.
 
         final ImageView thumb = holder.videoThumb;
         final View playOverlay = holder.playButtonOverlay;
-        final VideoView player = holder.player;
+        final PlayerView player = holder.player;
         holder.videoTimeOverlay.setText(DateFormat.format("hh:mm a", message.time));
 
         holder.videoSaveButton.setOnClickListener(new View.OnClickListener() {
@@ -208,60 +243,61 @@ public class ChatMessageAdapter extends RecyclerView.Adapter<ChatMessageAdapter.
             holder.videoExpandButton.setVisibility(View.GONE);
             holder.videoTimeOverlay.setVisibility(View.GONE);
 
-            // The thumbnail (adjustViewBounds) is what actually sizes the
-            // bubble to the video's real aspect ratio. Once it's hidden the
-            // VideoView needs an explicit height or the bubble would collapse
-            // — so we lock it to whatever height the thumbnail last measured.
-            int lockedHeight = thumb.getHeight() > 0 ? thumb.getHeight() : player.getLayoutParams().height;
+            // Same height formula the thumbnail state uses below, read from
+            // the same cached frame — guarantees a pixel-identical height so
+            // there's no jump when swapping from thumbnail to player.
+            int height = videoContainerHeightPx(VideoThumbnailLoader.getCached(message.videoUrl));
             ViewGroup.LayoutParams lp = player.getLayoutParams();
-            if (lp.height != lockedHeight) {
-                lp.height = lockedHeight;
+            if (lp.height != height) {
+                lp.height = height;
                 player.setLayoutParams(lp);
             }
             player.setVisibility(View.VISIBLE);
 
-            if (!player.isPlaying()) {
-                player.setVideoURI(Uri.parse(message.videoUrl));
-                player.setOnPreparedListener(new MediaPlayer.OnPreparedListener() {
-                    @Override
-                    public void onPrepared(MediaPlayer mp) {
-                        mp.setLooping(false);
-                        player.start();
-                    }
-                });
-                player.setOnCompletionListener(new MediaPlayer.OnCompletionListener() {
-                    @Override
-                    public void onCompletion(MediaPlayer mp) {
-                        if (currentlyPlaying == message) {
-                            currentlyPlaying = null;
-                            notifyItemChanged(holder.getAdapterPosition());
-                        }
-                    }
-                });
-                player.setOnErrorListener(new MediaPlayer.OnErrorListener() {
-                    @Override
-                    public boolean onError(MediaPlayer mp, int what, int extra) {
-                        if (currentlyPlaying == message) {
-                            currentlyPlaying = null;
-                            notifyItemChanged(holder.getAdapterPosition());
-                        }
-                        return true;
-                    }
-                });
+            if (holder.exoPlayer == null) {
+                holder.exoPlayer = new ExoPlayer.Builder(context).build();
+                players.add(holder.exoPlayer);
+                player.setPlayer(holder.exoPlayer);
             }
+            final ExoPlayer exoPlayer = holder.exoPlayer;
+
+            if (exoPlayer.getPlaybackState() == Player.STATE_IDLE || exoPlayer.getCurrentMediaItem() == null) {
+                exoPlayer.addListener(new Player.Listener() {
+                    @Override
+                    public void onPlaybackStateChanged(int playbackState) {
+                        if (playbackState == Player.STATE_ENDED && currentlyPlaying == message) {
+                            currentlyPlaying = null;
+                            notifyItemChanged(holder.getAdapterPosition());
+                        }
+                    }
+
+                    @Override
+                    public void onPlayerError(PlaybackException error) {
+                        if (currentlyPlaying == message) {
+                            currentlyPlaying = null;
+                            notifyItemChanged(holder.getAdapterPosition());
+                        }
+                    }
+                });
+                exoPlayer.setMediaItem(MediaItem.fromUri(message.videoUrl));
+                exoPlayer.setRepeatMode(Player.REPEAT_MODE_OFF);
+                exoPlayer.prepare();
+            }
+            exoPlayer.setPlayWhenReady(true);
 
             // Tap the playing video again to stop and go back to the thumbnail.
             holder.videoContainer.setOnClickListener(new View.OnClickListener() {
                 @Override
                 public void onClick(View v) {
-                    player.stopPlayback();
+                    exoPlayer.pause();
+                    exoPlayer.seekTo(0);
                     currentlyPlaying = null;
                     notifyItemChanged(holder.getAdapterPosition());
                 }
             });
         } else {
-            if (player.isPlaying()) {
-                player.stopPlayback();
+            if (holder.exoPlayer != null) {
+                holder.exoPlayer.stop();
             }
             player.setVisibility(View.GONE);
             thumb.setVisibility(View.VISIBLE);
@@ -302,6 +338,16 @@ public class ChatMessageAdapter extends RecyclerView.Adapter<ChatMessageAdapter.
         context.startActivity(intent);
     }
 
+    // Every inline chat-bubble ExoPlayer this adapter has created, including
+    // ones on rows currently scrolled off-screen. Call from the host
+    // Activity's onDestroy() so playback surfaces don't leak.
+    public void releaseAllPlayers() {
+        for (ExoPlayer p : players) {
+            p.release();
+        }
+        players.clear();
+    }
+
     static class MessageViewHolder extends RecyclerView.ViewHolder {
         View messageRow;
         View bubbleContainer;
@@ -318,7 +364,8 @@ public class ChatMessageAdapter extends RecyclerView.Adapter<ChatMessageAdapter.
         View videoContainer;
         ImageView videoThumb;
         View playButtonOverlay;
-        VideoView player;
+        PlayerView player;
+        ExoPlayer exoPlayer;
         View videoSaveButton;
         View videoExpandButton;
         TextView videoTimeOverlay;

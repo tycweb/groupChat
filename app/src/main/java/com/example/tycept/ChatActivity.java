@@ -439,5 +439,8 @@ public class ChatActivity extends Activity {
         if (socket != null && onNewMessage != null) {
             socket.off("message", onNewMessage);
         }
+        if (adapter != null) {
+            adapter.releaseAllPlayers();
+        }
     }
 }

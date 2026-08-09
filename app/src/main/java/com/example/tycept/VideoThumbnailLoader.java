@@ -25,6 +25,14 @@ class VideoThumbnailLoader {
     private static final Set<String> loading = new HashSet<>();
     private static final Handler mainHandler = new Handler(Looper.getMainLooper());
 
+    // Exposes the cached frame so callers can read its width/height (i.e. the
+    // video's real aspect ratio) without re-decoding anything. Used to size
+    // the inline player identically to the thumbnail it replaces, so the
+    // chat bubble never visibly resizes when playback starts.
+    static Bitmap getCached(String videoUrl) {
+        return cache.get(videoUrl);
+    }
+
     static void load(final String videoUrl, final ImageView target) {
         target.setTag(videoUrl);
 
