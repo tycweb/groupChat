@@ -12,8 +12,9 @@
         android:layout_height="wrap_content"
         android:layout_gravity="start"
         android:orientation="vertical"
-        android:background="@drawable/bubble_received_glass"
+        android:background="@drawable/bubble_received"
         android:clipToOutline="true"
+        android:elevation="1dp"
         android:layout_marginEnd="60dp">
 
         <TextView

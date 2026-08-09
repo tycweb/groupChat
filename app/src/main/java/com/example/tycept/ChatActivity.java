@@ -15,9 +15,11 @@ import android.util.Base64;
 import android.view.View;
 
 import android.widget.EditText;
-import android.widget.ListView;
 import android.widget.TextView;
 import android.widget.Toast;
+
+import androidx.recyclerview.widget.LinearLayoutManager;
+import androidx.recyclerview.widget.RecyclerView;
 
 import java.io.ByteArrayOutputStream;
 import java.io.InputStream;
@@ -43,7 +45,8 @@ public class ChatActivity extends Activity {
     private String conversationId;
     private String myName;
 
-    private ListView listView;
+    private RecyclerView listView;
+    private LinearLayoutManager layoutManager;
     private View skeletonContainer;
     private ObjectAnimator skeletonAnimator;
     private EditText messageInput;
@@ -103,7 +106,11 @@ public class ChatActivity extends Activity {
         attachButton = findViewById(R.id.attachButton);
 
         adapter = new ChatMessageAdapter(this, messages);
+        layoutManager = new LinearLayoutManager(this);
+        listView.setLayoutManager(layoutManager);
         listView.setAdapter(adapter);
+        listView.setItemAnimator(null); // avoid the default fade/move animation
+        // firing every time a video toggles play state via notifyItemChanged
 
         skeletonAnimator = ObjectAnimator.ofFloat(skeletonContainer, "alpha", 1f, 0.35f);
         skeletonAnimator.setDuration(700);
@@ -181,7 +188,7 @@ public class ChatActivity extends Activity {
         }
         adapter.notifyDataSetChanged();
         if (!messages.isEmpty()) {
-            listView.setSelection(messages.size() - 1);
+            listView.scrollToPosition(messages.size() - 1);
         }
         hideSkeleton();
     }
@@ -240,7 +247,7 @@ public class ChatActivity extends Activity {
                         if (!msgConvId.equals(conversationId)) return;
                         addMessageFromJson(m);
                         adapter.notifyDataSetChanged();
-                        listView.setSelection(messages.size() - 1);
+                        listView.scrollToPosition(messages.size() - 1);
                     }
                 });
             }

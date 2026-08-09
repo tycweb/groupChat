@@ -10,19 +10,29 @@ import android.text.format.DateFormat;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
-import android.widget.ArrayAdapter;
 import android.widget.ImageView;
 import android.widget.TextView;
 import android.widget.VideoView;
+
+import androidx.annotation.NonNull;
+import androidx.recyclerview.widget.RecyclerView;
 
 import com.bumptech.glide.Glide;
 import com.bumptech.glide.load.resource.drawable.DrawableTransitionOptions;
 
 import java.util.List;
 
-public class ChatMessageAdapter extends ArrayAdapter<ChatMessage> {
+// RecyclerView.Adapter replaces the old ListView/ArrayAdapter. ListView's row
+// recycling doesn't reliably re-measure a recycled row when its content type
+// changes drastically between binds (e.g. a tall video row recycled into a
+// short text-only row), which produced visible overlap between messages.
+// RecyclerView's ViewHolder pattern + per-item measurement doesn't have that
+// failure mode.
+public class ChatMessageAdapter extends RecyclerView.Adapter<ChatMessageAdapter.MessageViewHolder> {
 
-    private LayoutInflater inflater;
+    private final Context context;
+    private final List<ChatMessage> messages;
+    private final LayoutInflater inflater;
 
     // Only one video plays inline at a time, like Messenger — tapping a
     // different one (or scrolling it off) reverts the previous back to its
@@ -30,88 +40,90 @@ public class ChatMessageAdapter extends ArrayAdapter<ChatMessage> {
     private ChatMessage currentlyPlaying;
 
     public ChatMessageAdapter(Context context, List<ChatMessage> messages) {
-        super(context, 0, messages);
-        inflater = LayoutInflater.from(context);
-    }
-
-    @Override
-    public int getViewTypeCount() {
-        return 2;
+        this.context = context;
+        this.messages = messages;
+        this.inflater = LayoutInflater.from(context);
     }
 
     @Override
     public int getItemViewType(int position) {
-        return getItem(position).type;
+        return messages.get(position).type;
     }
 
     @Override
-    public View getView(int position, View convertView, ViewGroup parent) {
-        final ChatMessage message = getItem(position);
-        int layout = message.type == ChatMessage.TYPE_SENT
+    public int getItemCount() {
+        return messages.size();
+    }
+
+    @NonNull
+    @Override
+    public MessageViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
+        int layout = viewType == ChatMessage.TYPE_SENT
                 ? R.layout.item_message_sent
                 : R.layout.item_message_received;
+        View view = inflater.inflate(layout, parent, false);
+        return new MessageViewHolder(view);
+    }
 
-        View view = convertView;
-        if (view == null) {
-            view = inflater.inflate(layout, parent, false);
-        }
+    @Override
+    public void onBindViewHolder(@NonNull MessageViewHolder holder, int position) {
+        final ChatMessage message = messages.get(position);
 
-        TextView senderView = view.findViewById(R.id.messageSender);
-        TextView textView = view.findViewById(R.id.messageText);
-        TextView timeView = view.findViewById(R.id.messageTime);
-        View textWrap = view.findViewById(R.id.messageTextWrap);
-
-        if (senderView != null) {
+        if (holder.senderView != null) {
             if (message.type == ChatMessage.TYPE_RECEIVED) {
-                senderView.setText(message.senderName);
-                senderView.setVisibility(View.VISIBLE);
+                holder.senderView.setText(message.senderName);
+                holder.senderView.setVisibility(View.VISIBLE);
             } else {
-                senderView.setVisibility(View.GONE);
+                holder.senderView.setVisibility(View.GONE);
             }
         }
 
         if (TextUtils.isEmpty(message.text)) {
             // Pure photo/video message — the timestamp lives on the media
             // overlay instead, so this whole row would just be dead space.
-            textWrap.setVisibility(View.GONE);
+            holder.textWrap.setVisibility(View.GONE);
         } else {
-            textWrap.setVisibility(View.VISIBLE);
-            textView.setText(message.text);
+            holder.textWrap.setVisibility(View.VISIBLE);
+            holder.textView.setText(message.text);
         }
 
-        bindImage(view, message);
-        bindVideo(view, message);
+        bindImage(holder, message);
+        bindVideo(holder, message);
 
-        timeView.setText(DateFormat.format("hh:mm a", message.time));
-
-        return view;
+        holder.timeView.setText(DateFormat.format("hh:mm a", message.time));
     }
 
-    private void bindImage(View row, final ChatMessage message) {
-        View wrap = row.findViewById(R.id.messageImageWrap);
-        final ImageView imageView = row.findViewById(R.id.messageImage);
-        View saveButton = row.findViewById(R.id.imageSaveButton);
-        TextView timeOverlay = row.findViewById(R.id.imageTimeOverlay);
+    @Override
+    public void onViewRecycled(@NonNull MessageViewHolder holder) {
+        super.onViewRecycled(holder);
+        // A recycled row might still be holding a live player from whatever
+        // message it displayed before — make sure it's stopped so audio/video
+        // doesn't keep running behind a different, now-visible row.
+        if (holder.player != null && holder.player.isPlaying()) {
+            holder.player.stopPlayback();
+        }
+    }
 
+    private void bindImage(final MessageViewHolder holder, final ChatMessage message) {
         if (TextUtils.isEmpty(message.imageUrl)) {
-            wrap.setVisibility(View.GONE);
+            holder.imageWrap.setVisibility(View.GONE);
             return;
         }
 
-        wrap.setVisibility(View.VISIBLE);
-        timeOverlay.setText(DateFormat.format("hh:mm a", message.time));
-        Glide.with(getContext())
+        holder.imageWrap.setVisibility(View.VISIBLE);
+        holder.imageTimeOverlay.setText(DateFormat.format("hh:mm a", message.time));
+        Glide.with(context)
                 .load(message.imageUrl)
                 .transition(DrawableTransitionOptions.withCrossFade(200))
-                .into(imageView);
+                .into(holder.imageView);
 
-        imageView.setOnClickListener(new View.OnClickListener() {
+        holder.imageView.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
                 openInApp(message.imageUrl, false);
             }
         });
-        saveButton.setOnClickListener(new View.OnClickListener() {
+        holder.imageSaveButton.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
                 saveMedia(message.imageUrl, false);
@@ -119,30 +131,25 @@ public class ChatMessageAdapter extends ArrayAdapter<ChatMessage> {
         });
     }
 
-    private void bindVideo(View row, final ChatMessage message) {
-        View videoContainer = row.findViewById(R.id.messageVideoContainer);
-
+    private void bindVideo(final MessageViewHolder holder, final ChatMessage message) {
         if (TextUtils.isEmpty(message.videoUrl)) {
-            videoContainer.setVisibility(View.GONE);
+            holder.videoContainer.setVisibility(View.GONE);
             return;
         }
-        videoContainer.setVisibility(View.VISIBLE);
+        holder.videoContainer.setVisibility(View.VISIBLE);
 
-        final ImageView thumb = row.findViewById(R.id.messageVideoThumb);
-        final View playOverlay = row.findViewById(R.id.playButtonOverlay);
-        final VideoView player = row.findViewById(R.id.messageVideoPlayer);
-        View saveButton = row.findViewById(R.id.videoSaveButton);
-        View expandButton = row.findViewById(R.id.videoExpandButton);
-        final TextView timeOverlay = row.findViewById(R.id.videoTimeOverlay);
-        timeOverlay.setText(DateFormat.format("hh:mm a", message.time));
+        final ImageView thumb = holder.videoThumb;
+        final View playOverlay = holder.playButtonOverlay;
+        final VideoView player = holder.player;
+        holder.videoTimeOverlay.setText(DateFormat.format("hh:mm a", message.time));
 
-        saveButton.setOnClickListener(new View.OnClickListener() {
+        holder.videoSaveButton.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
                 saveMedia(message.videoUrl, true);
             }
         });
-        expandButton.setOnClickListener(new View.OnClickListener() {
+        holder.videoExpandButton.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
                 openInApp(message.videoUrl, true);
@@ -152,9 +159,9 @@ public class ChatMessageAdapter extends ArrayAdapter<ChatMessage> {
         if (message == currentlyPlaying) {
             thumb.setVisibility(View.GONE);
             playOverlay.setVisibility(View.GONE);
-            saveButton.setVisibility(View.GONE);
-            expandButton.setVisibility(View.GONE);
-            timeOverlay.setVisibility(View.GONE);
+            holder.videoSaveButton.setVisibility(View.GONE);
+            holder.videoExpandButton.setVisibility(View.GONE);
+            holder.videoTimeOverlay.setVisibility(View.GONE);
 
             // The thumbnail (adjustViewBounds) is what actually sizes the
             // bubble to the video's real aspect ratio. Once it's hidden the
@@ -182,7 +189,7 @@ public class ChatMessageAdapter extends ArrayAdapter<ChatMessage> {
                     public void onCompletion(MediaPlayer mp) {
                         if (currentlyPlaying == message) {
                             currentlyPlaying = null;
-                            notifyDataSetChanged();
+                            notifyItemChanged(holder.getAdapterPosition());
                         }
                     }
                 });
@@ -191,7 +198,7 @@ public class ChatMessageAdapter extends ArrayAdapter<ChatMessage> {
                     public boolean onError(MediaPlayer mp, int what, int extra) {
                         if (currentlyPlaying == message) {
                             currentlyPlaying = null;
-                            notifyDataSetChanged();
+                            notifyItemChanged(holder.getAdapterPosition());
                         }
                         return true;
                     }
@@ -199,29 +206,27 @@ public class ChatMessageAdapter extends ArrayAdapter<ChatMessage> {
             }
 
             // Tap the playing video again to stop and go back to the thumbnail.
-            videoContainer.setOnClickListener(new View.OnClickListener() {
+            holder.videoContainer.setOnClickListener(new View.OnClickListener() {
                 @Override
                 public void onClick(View v) {
                     player.stopPlayback();
                     currentlyPlaying = null;
-                    notifyDataSetChanged();
+                    notifyItemChanged(holder.getAdapterPosition());
                 }
             });
         } else {
-            // Defensive: this recycled row might still be holding a live player
-            // from whatever message it displayed before — make sure it's stopped.
             if (player.isPlaying()) {
                 player.stopPlayback();
             }
             player.setVisibility(View.GONE);
             thumb.setVisibility(View.VISIBLE);
             playOverlay.setVisibility(View.VISIBLE);
-            saveButton.setVisibility(View.VISIBLE);
-            expandButton.setVisibility(View.VISIBLE);
-            timeOverlay.setVisibility(View.VISIBLE);
+            holder.videoSaveButton.setVisibility(View.VISIBLE);
+            holder.videoExpandButton.setVisibility(View.VISIBLE);
+            holder.videoTimeOverlay.setVisibility(View.VISIBLE);
             VideoThumbnailLoader.load(message.videoUrl, thumb);
 
-            videoContainer.setOnClickListener(new View.OnClickListener() {
+            holder.videoContainer.setOnClickListener(new View.OnClickListener() {
                 @Override
                 public void onClick(View v) {
                     // Quick press-bounce on the play button for a bit of life
@@ -231,7 +236,7 @@ public class ChatMessageAdapter extends ArrayAdapter<ChatMessage> {
                                 @Override
                                 public void run() {
                                     currentlyPlaying = message;
-                                    notifyDataSetChanged();
+                                    notifyItemChanged(holder.getAdapterPosition());
                                 }
                             }).start();
                 }
@@ -239,18 +244,57 @@ public class ChatMessageAdapter extends ArrayAdapter<ChatMessage> {
         }
     }
 
-
     private void saveMedia(String url, boolean isVideo) {
-        Context context = getContext();
         if (context instanceof Activity) {
             MediaSaver.save((Activity) context, url, isVideo);
         }
     }
 
     private void openInApp(String url, boolean isVideo) {
-        Intent intent = new Intent(getContext(), MediaViewerActivity.class);
+        Intent intent = new Intent(context, MediaViewerActivity.class);
         intent.putExtra(MediaViewerActivity.EXTRA_URL, url);
         intent.putExtra(MediaViewerActivity.EXTRA_IS_VIDEO, isVideo);
-        getContext().startActivity(intent);
+        context.startActivity(intent);
+    }
+
+    static class MessageViewHolder extends RecyclerView.ViewHolder {
+        TextView senderView;
+        TextView textView;
+        TextView timeView;
+        View textWrap;
+
+        View imageWrap;
+        ImageView imageView;
+        View imageSaveButton;
+        TextView imageTimeOverlay;
+
+        View videoContainer;
+        ImageView videoThumb;
+        View playButtonOverlay;
+        VideoView player;
+        View videoSaveButton;
+        View videoExpandButton;
+        TextView videoTimeOverlay;
+
+        MessageViewHolder(View row) {
+            super(row);
+            senderView = row.findViewById(R.id.messageSender);
+            textView = row.findViewById(R.id.messageText);
+            timeView = row.findViewById(R.id.messageTime);
+            textWrap = row.findViewById(R.id.messageTextWrap);
+
+            imageWrap = row.findViewById(R.id.messageImageWrap);
+            imageView = row.findViewById(R.id.messageImage);
+            imageSaveButton = row.findViewById(R.id.imageSaveButton);
+            imageTimeOverlay = row.findViewById(R.id.imageTimeOverlay);
+
+            videoContainer = row.findViewById(R.id.messageVideoContainer);
+            videoThumb = row.findViewById(R.id.messageVideoThumb);
+            playButtonOverlay = row.findViewById(R.id.playButtonOverlay);
+            player = row.findViewById(R.id.messageVideoPlayer);
+            videoSaveButton = row.findViewById(R.id.videoSaveButton);
+            videoExpandButton = row.findViewById(R.id.videoExpandButton);
+            videoTimeOverlay = row.findViewById(R.id.videoTimeOverlay);
+        }
     }
 }
