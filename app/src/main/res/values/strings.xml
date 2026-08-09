@@ -1,0 +1,4 @@
+<resources>
+    <string name="app_name">APK Builder</string>
+    <string name="base_url">https://test-apk-builder.onrender.com/</string>
+</resources>
