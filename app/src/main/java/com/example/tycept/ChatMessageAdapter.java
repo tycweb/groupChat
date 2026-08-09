@@ -39,6 +39,11 @@ public class ChatMessageAdapter extends RecyclerView.Adapter<ChatMessageAdapter.
     // thumbnail. This is UI-only state, not persisted with the message.
     private ChatMessage currentlyPlaying;
 
+    // Matches the web app's GROUP_WINDOW_MS: consecutive messages from the
+    // same sender within this window are visually grouped — name/avatar and
+    // timestamp only show once per run, and the seam between bubbles flattens.
+    private static final long GROUP_WINDOW_MS = 5 * 60 * 1000;
+
     public ChatMessageAdapter(Context context, List<ChatMessage> messages) {
         this.context = context;
         this.messages = messages;
@@ -69,8 +74,12 @@ public class ChatMessageAdapter extends RecyclerView.Adapter<ChatMessageAdapter.
     public void onBindViewHolder(@NonNull MessageViewHolder holder, int position) {
         final ChatMessage message = messages.get(position);
 
+        boolean groupedPrev = isGrouped(messages.get(Math.max(position - 1, 0)), message, position > 0);
+        boolean groupedNext = position < messages.size() - 1
+                && isGrouped(message, messages.get(position + 1), true);
+
         if (holder.senderView != null) {
-            if (message.type == ChatMessage.TYPE_RECEIVED) {
+            if (message.type == ChatMessage.TYPE_RECEIVED && !groupedPrev) {
                 holder.senderView.setText(message.senderName);
                 holder.senderView.setVisibility(View.VISIBLE);
             } else {
@@ -85,12 +94,47 @@ public class ChatMessageAdapter extends RecyclerView.Adapter<ChatMessageAdapter.
         } else {
             holder.textWrap.setVisibility(View.VISIBLE);
             holder.textView.setText(message.text);
+            // Messenger only shows the timestamp on the last bubble of a run.
+            holder.timeView.setVisibility(groupedNext ? View.GONE : View.VISIBLE);
         }
 
-        bindImage(holder, message);
-        bindVideo(holder, message);
+        bindImage(holder, message, groupedNext);
+        bindVideo(holder, message, groupedNext);
 
         holder.timeView.setText(DateFormat.format("hh:mm a", message.time));
+
+        // Flatten the seam corner(s) that touch a neighboring bubble from the
+        // same sender, and tighten the row's top spacing so a run reads as
+        // one continuous shape rather than separate rounded pills.
+        boolean isSent = message.type == ChatMessage.TYPE_SENT;
+        int bubbleRes;
+        if (groupedPrev && groupedNext) {
+            bubbleRes = isSent ? R.drawable.bubble_sent_grouped_both : R.drawable.bubble_received_grouped_both;
+        } else if (groupedPrev) {
+            bubbleRes = isSent ? R.drawable.bubble_sent_grouped_prev : R.drawable.bubble_received_grouped_prev;
+        } else if (groupedNext) {
+            bubbleRes = isSent ? R.drawable.bubble_sent_grouped_next : R.drawable.bubble_received_grouped_next;
+        } else {
+            bubbleRes = isSent ? R.drawable.bubble_sent : R.drawable.bubble_received;
+        }
+        holder.bubbleContainer.setBackgroundResource(bubbleRes);
+
+        int density = (int) (2 * context.getResources().getDisplayMetrics().density);
+        int normalTopPadding = (int) (4 * context.getResources().getDisplayMetrics().density);
+        holder.messageRow.setPadding(
+                holder.messageRow.getPaddingLeft(),
+                groupedPrev ? density : normalTopPadding,
+                holder.messageRow.getPaddingRight(),
+                holder.messageRow.getPaddingBottom());
+    }
+
+    // Mirrors the web app's groupedPrev/groupedNext check: same sender name,
+    // within the grouping window, neither deleted.
+    private boolean isGrouped(ChatMessage earlier, ChatMessage later, boolean hasNeighbor) {
+        if (!hasNeighbor || earlier == later) return false;
+        return earlier.senderName != null
+                && earlier.senderName.equals(later.senderName)
+                && Math.abs(later.time - earlier.time) < GROUP_WINDOW_MS;
     }
 
     @Override
@@ -104,13 +148,14 @@ public class ChatMessageAdapter extends RecyclerView.Adapter<ChatMessageAdapter.
         }
     }
 
-    private void bindImage(final MessageViewHolder holder, final ChatMessage message) {
+    private void bindImage(final MessageViewHolder holder, final ChatMessage message, boolean groupedNext) {
         if (TextUtils.isEmpty(message.imageUrl)) {
             holder.imageWrap.setVisibility(View.GONE);
             return;
         }
 
         holder.imageWrap.setVisibility(View.VISIBLE);
+        holder.imageTimeOverlay.setVisibility(groupedNext ? View.GONE : View.VISIBLE);
         holder.imageTimeOverlay.setText(DateFormat.format("hh:mm a", message.time));
         Glide.with(context)
                 .load(message.imageUrl)
@@ -131,7 +176,7 @@ public class ChatMessageAdapter extends RecyclerView.Adapter<ChatMessageAdapter.
         });
     }
 
-    private void bindVideo(final MessageViewHolder holder, final ChatMessage message) {
+    private void bindVideo(final MessageViewHolder holder, final ChatMessage message, final boolean groupedNext) {
         if (TextUtils.isEmpty(message.videoUrl)) {
             holder.videoContainer.setVisibility(View.GONE);
             return;
@@ -223,7 +268,7 @@ public class ChatMessageAdapter extends RecyclerView.Adapter<ChatMessageAdapter.
             playOverlay.setVisibility(View.VISIBLE);
             holder.videoSaveButton.setVisibility(View.VISIBLE);
             holder.videoExpandButton.setVisibility(View.VISIBLE);
-            holder.videoTimeOverlay.setVisibility(View.VISIBLE);
+            holder.videoTimeOverlay.setVisibility(groupedNext ? View.GONE : View.VISIBLE);
             VideoThumbnailLoader.load(message.videoUrl, thumb);
 
             holder.videoContainer.setOnClickListener(new View.OnClickListener() {
@@ -258,6 +303,8 @@ public class ChatMessageAdapter extends RecyclerView.Adapter<ChatMessageAdapter.
     }
 
     static class MessageViewHolder extends RecyclerView.ViewHolder {
+        View messageRow;
+        View bubbleContainer;
         TextView senderView;
         TextView textView;
         TextView timeView;
@@ -278,6 +325,8 @@ public class ChatMessageAdapter extends RecyclerView.Adapter<ChatMessageAdapter.
 
         MessageViewHolder(View row) {
             super(row);
+            messageRow = row.findViewById(R.id.messageRow);
+            bubbleContainer = row.findViewById(R.id.bubbleContainer);
             senderView = row.findViewById(R.id.messageSender);
             textView = row.findViewById(R.id.messageText);
             timeView = row.findViewById(R.id.messageTime);

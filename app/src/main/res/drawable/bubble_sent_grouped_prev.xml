@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Sent bubble that follows another from the same sender: top-right seam
+     flattens to 6dp (matches web .msg-row.me.grouped-prev .msg-bubble). -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="rectangle">
+    <gradient android:type="linear" android:angle="315" android:startColor="@color/accent1" android:endColor="@color/accent2" />
+    <corners
+        android:topLeftRadius="18dp"
+        android:topRightRadius="6dp"
+        android:bottomLeftRadius="18dp"
+        android:bottomRightRadius="5dp" />
+</shape>
