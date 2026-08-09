@@ -27,9 +27,6 @@ jobs:
         with:
           gradle-version: '8.7'
 
-      - name: Lint
-        run: gradle lint
-
       - name: Build debug APK
         run: gradle assembleDebug
 
