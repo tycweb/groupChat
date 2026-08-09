@@ -20,12 +20,16 @@ import com.bumptech.glide.request.target.Target;
 
 // Full-screen in-app viewer for chat photos/videos, launched from
 // ChatMessageAdapter instead of handing the URL off to an external app.
+// Both photos and videos are pinch-zoomable via PinchZoomLayout (see that
+// class for why it owns touch input directly rather than passing taps
+// through to the VideoView).
 public class MediaViewerActivity extends Activity {
 
     public static final String EXTRA_URL = "url";
     public static final String EXTRA_IS_VIDEO = "isVideo";
 
     private VideoView videoView;
+    private MediaController mediaController;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -37,6 +41,8 @@ public class MediaViewerActivity extends Activity {
 
         ImageView imageView = findViewById(R.id.viewerImage);
         videoView = findViewById(R.id.viewerVideo);
+        PinchZoomLayout imageZoomLayout = findViewById(R.id.imageZoomLayout);
+        PinchZoomLayout videoZoomLayout = findViewById(R.id.videoZoomLayout);
         final ProgressBar progressBar = findViewById(R.id.viewerProgress);
         View closeButton = findViewById(R.id.closeButton);
 
@@ -53,13 +59,29 @@ public class MediaViewerActivity extends Activity {
         }
 
         if (isVideo) {
-            imageView.setVisibility(View.GONE);
-            videoView.setVisibility(View.VISIBLE);
+            imageZoomLayout.setVisibility(View.GONE);
+            videoZoomLayout.setVisibility(View.VISIBLE);
+            videoZoomLayout.resetZoom();
 
-            MediaController controller = new MediaController(this);
-            controller.setAnchorView(videoView);
-            videoView.setMediaController(controller);
+            mediaController = new MediaController(this);
+            mediaController.setAnchorView(videoView);
+            videoView.setMediaController(mediaController);
             videoView.setVideoURI(Uri.parse(url));
+
+            // The VideoView never receives raw touches directly (PinchZoomLayout
+            // owns them so pinch/pan work), so a tap has to re-show the
+            // controller ourselves instead of relying on VideoView's own
+            // touch-to-reveal behavior.
+            videoZoomLayout.setOnSingleTapListener(new PinchZoomLayout.OnSingleTapListener() {
+                @Override
+                public void onSingleTap() {
+                    if (mediaController.isShowing()) {
+                        mediaController.hide();
+                    } else {
+                        mediaController.show();
+                    }
+                }
+            });
 
             videoView.setOnPreparedListener(new MediaPlayer.OnPreparedListener() {
                 @Override
@@ -77,8 +99,9 @@ public class MediaViewerActivity extends Activity {
                 }
             });
         } else {
-            videoView.setVisibility(View.GONE);
-            imageView.setVisibility(View.VISIBLE);
+            videoZoomLayout.setVisibility(View.GONE);
+            imageZoomLayout.setVisibility(View.VISIBLE);
+            imageZoomLayout.resetZoom();
 
             Glide.with(this).load(url).listener(new RequestListener<Drawable>() {
                 @Override

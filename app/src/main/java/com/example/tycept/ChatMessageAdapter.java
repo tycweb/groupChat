@@ -59,6 +59,7 @@ public class ChatMessageAdapter extends ArrayAdapter<ChatMessage> {
         TextView senderView = view.findViewById(R.id.messageSender);
         TextView textView = view.findViewById(R.id.messageText);
         TextView timeView = view.findViewById(R.id.messageTime);
+        View textWrap = view.findViewById(R.id.messageTextWrap);
 
         if (senderView != null) {
             if (message.type == ChatMessage.TYPE_RECEIVED) {
@@ -70,9 +71,11 @@ public class ChatMessageAdapter extends ArrayAdapter<ChatMessage> {
         }
 
         if (TextUtils.isEmpty(message.text)) {
-            textView.setVisibility(View.GONE);
+            // Pure photo/video message — the timestamp lives on the media
+            // overlay instead, so this whole row would just be dead space.
+            textWrap.setVisibility(View.GONE);
         } else {
-            textView.setVisibility(View.VISIBLE);
+            textWrap.setVisibility(View.VISIBLE);
             textView.setText(message.text);
         }
 
@@ -88,6 +91,7 @@ public class ChatMessageAdapter extends ArrayAdapter<ChatMessage> {
         View wrap = row.findViewById(R.id.messageImageWrap);
         final ImageView imageView = row.findViewById(R.id.messageImage);
         View saveButton = row.findViewById(R.id.imageSaveButton);
+        TextView timeOverlay = row.findViewById(R.id.imageTimeOverlay);
 
         if (TextUtils.isEmpty(message.imageUrl)) {
             wrap.setVisibility(View.GONE);
@@ -95,6 +99,7 @@ public class ChatMessageAdapter extends ArrayAdapter<ChatMessage> {
         }
 
         wrap.setVisibility(View.VISIBLE);
+        timeOverlay.setText(DateFormat.format("hh:mm a", message.time));
         Glide.with(getContext())
                 .load(message.imageUrl)
                 .transition(DrawableTransitionOptions.withCrossFade(200))
@@ -127,6 +132,9 @@ public class ChatMessageAdapter extends ArrayAdapter<ChatMessage> {
         final View playOverlay = row.findViewById(R.id.playButtonOverlay);
         final VideoView player = row.findViewById(R.id.messageVideoPlayer);
         View saveButton = row.findViewById(R.id.videoSaveButton);
+        View expandButton = row.findViewById(R.id.videoExpandButton);
+        final TextView timeOverlay = row.findViewById(R.id.videoTimeOverlay);
+        timeOverlay.setText(DateFormat.format("hh:mm a", message.time));
 
         saveButton.setOnClickListener(new View.OnClickListener() {
             @Override
@@ -134,11 +142,30 @@ public class ChatMessageAdapter extends ArrayAdapter<ChatMessage> {
                 saveMedia(message.videoUrl, true);
             }
         });
+        expandButton.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                openInApp(message.videoUrl, true);
+            }
+        });
 
         if (message == currentlyPlaying) {
             thumb.setVisibility(View.GONE);
             playOverlay.setVisibility(View.GONE);
             saveButton.setVisibility(View.GONE);
+            expandButton.setVisibility(View.GONE);
+            timeOverlay.setVisibility(View.GONE);
+
+            // The thumbnail (adjustViewBounds) is what actually sizes the
+            // bubble to the video's real aspect ratio. Once it's hidden the
+            // VideoView needs an explicit height or the bubble would collapse
+            // — so we lock it to whatever height the thumbnail last measured.
+            int lockedHeight = thumb.getHeight() > 0 ? thumb.getHeight() : player.getLayoutParams().height;
+            ViewGroup.LayoutParams lp = player.getLayoutParams();
+            if (lp.height != lockedHeight) {
+                lp.height = lockedHeight;
+                player.setLayoutParams(lp);
+            }
             player.setVisibility(View.VISIBLE);
 
             if (!player.isPlaying()) {
@@ -190,6 +217,8 @@ public class ChatMessageAdapter extends ArrayAdapter<ChatMessage> {
             thumb.setVisibility(View.VISIBLE);
             playOverlay.setVisibility(View.VISIBLE);
             saveButton.setVisibility(View.VISIBLE);
+            expandButton.setVisibility(View.VISIBLE);
+            timeOverlay.setVisibility(View.VISIBLE);
             VideoThumbnailLoader.load(message.videoUrl, thumb);
 
             videoContainer.setOnClickListener(new View.OnClickListener() {
@@ -209,6 +238,7 @@ public class ChatMessageAdapter extends ArrayAdapter<ChatMessage> {
             });
         }
     }
+
 
     private void saveMedia(String url, boolean isVideo) {
         Context context = getContext();

@@ -4,18 +4,32 @@
     android:layout_height="match_parent"
     android:background="#000000">
 
-    <ImageView
-        android:id="@+id/viewerImage"
+    <com.example.tycept.PinchZoomLayout
+        android:id="@+id/imageZoomLayout"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:scaleType="fitCenter"
-        android:visibility="gone" />
+        android:visibility="gone">
 
-    <VideoView
-        android:id="@+id/viewerVideo"
+        <ImageView
+            android:id="@+id/viewerImage"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:scaleType="fitCenter" />
+
+    </com.example.tycept.PinchZoomLayout>
+
+    <com.example.tycept.PinchZoomLayout
+        android:id="@+id/videoZoomLayout"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:visibility="gone" />
+        android:visibility="gone">
+
+        <VideoView
+            android:id="@+id/viewerVideo"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent" />
+
+    </com.example.tycept.PinchZoomLayout>
 
     <ProgressBar
         android:id="@+id/viewerProgress"

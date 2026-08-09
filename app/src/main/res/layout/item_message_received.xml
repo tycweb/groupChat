@@ -26,18 +26,25 @@
             android:paddingStart="12dp"
             android:paddingTop="10dp" />
 
+        <!-- Sized to the actual photo's aspect ratio (adjustViewBounds) instead
+             of a fixed square, so there's no cropping and no leftover black
+             space below the image. Timestamp is overlaid directly on the
+             photo, bottom-end corner, matching the web app. -->
         <FrameLayout
             android:id="@+id/messageImageWrap"
             android:layout_width="230dp"
-            android:layout_height="230dp"
-            android:background="#000000"
+            android:layout_height="wrap_content"
             android:visibility="gone">
 
             <ImageView
                 android:id="@+id/messageImage"
                 android:layout_width="match_parent"
-                android:layout_height="match_parent"
-                android:scaleType="centerCrop" />
+                android:layout_height="wrap_content"
+                android:minHeight="120dp"
+                android:maxHeight="320dp"
+                android:adjustViewBounds="true"
+                android:scaleType="fitCenter"
+                android:background="@color/black3" />
 
             <FrameLayout
                 android:id="@+id/imageSaveButton"
@@ -55,25 +62,45 @@
 
             </FrameLayout>
 
+            <TextView
+                android:id="@+id/imageTimeOverlay"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="bottom|end"
+                android:layout_margin="8dp"
+                android:background="@drawable/media_time_chip"
+                android:paddingStart="6dp"
+                android:paddingEnd="6dp"
+                android:paddingTop="2dp"
+                android:paddingBottom="2dp"
+                android:textColor="@color/white"
+                android:textSize="11sp" />
+
         </FrameLayout>
 
+        <!-- Same idea for video: the thumbnail's real aspect ratio drives the
+             bubble's size (see ChatMessageAdapter for how the VideoView is
+             kept the same height once playback starts). -->
         <FrameLayout
             android:id="@+id/messageVideoContainer"
             android:layout_width="230dp"
-            android:layout_height="290dp"
-            android:background="#000000"
+            android:layout_height="wrap_content"
             android:visibility="gone">
 
             <ImageView
                 android:id="@+id/messageVideoThumb"
                 android:layout_width="match_parent"
-                android:layout_height="match_parent"
-                android:scaleType="fitCenter" />
+                android:layout_height="wrap_content"
+                android:minHeight="150dp"
+                android:maxHeight="320dp"
+                android:adjustViewBounds="true"
+                android:scaleType="fitCenter"
+                android:background="@color/black3" />
 
             <VideoView
                 android:id="@+id/messageVideoPlayer"
                 android:layout_width="match_parent"
-                android:layout_height="match_parent"
+                android:layout_height="200dp"
                 android:visibility="gone" />
 
             <FrameLayout
@@ -108,9 +135,43 @@
 
             </FrameLayout>
 
+            <FrameLayout
+                android:id="@+id/videoExpandButton"
+                android:layout_width="32dp"
+                android:layout_height="32dp"
+                android:layout_gravity="top|start"
+                android:layout_margin="8dp"
+                android:background="@drawable/save_button_bg">
+
+                <ImageView
+                    android:layout_width="16dp"
+                    android:layout_height="16dp"
+                    android:layout_gravity="center"
+                    android:src="@drawable/ic_expand" />
+
+            </FrameLayout>
+
+            <TextView
+                android:id="@+id/videoTimeOverlay"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="bottom|end"
+                android:layout_margin="8dp"
+                android:background="@drawable/media_time_chip"
+                android:paddingStart="6dp"
+                android:paddingEnd="6dp"
+                android:paddingTop="2dp"
+                android:paddingBottom="2dp"
+                android:textColor="@color/white"
+                android:textSize="11sp" />
+
         </FrameLayout>
 
+        <!-- Only present at all when the message actually has text — a pure
+             photo/video message relies on the overlay timestamp above instead,
+             so there's no empty extra row under the media. -->
         <LinearLayout
+            android:id="@+id/messageTextWrap"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:orientation="vertical"
