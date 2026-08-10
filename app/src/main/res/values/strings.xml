@@ -1,0 +1,8 @@
+<resources>
+    <string name="app_name">FlowCam</string>
+    <string name="permission_camera_rationale">Camera permission is required to use FlowCam.</string>
+    <string name="permission_mic_rationale">Microphone permission is required to record audio with your video.</string>
+    <string name="grant_permission">Grant permission</string>
+    <string name="fps_unavailable">60 FPS unavailable on this device</string>
+    <string name="camera_unavailable">Camera unavailable</string>
+</resources>
